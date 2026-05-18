@@ -2883,18 +2883,6 @@ class HermesCLI:
         self._background_tasks: Dict[str, threading.Thread] = {}
         self._background_task_counter = 0
 
-    def _emit_obsidian_hermes_busy(self, busy: bool) -> None:
-        """Emit a private Hermes Console busy/idle OSC marker when embedded in Obsidian."""
-        if os.environ.get("OBSIDIAN_HERMES_CONSOLE") != "1":
-            return
-        try:
-            if not sys.stdout.isatty():
-                return
-            sys.stdout.write(f"\x1b]777;hermes:busy={1 if busy else 0}\x07")
-            sys.stdout.flush()
-        except Exception:
-            pass
-
     def _invalidate(self, min_interval: float = 0.25) -> None:
         """Throttled UI repaint — prevents terminal blinking on slow/SSH connections."""
         if getattr(self, "_resize_recovery_pending", False):
@@ -11031,7 +11019,6 @@ class HermesCLI:
             # finishes; reset on the next turn.
             self._prompt_start_time = time.time()
             self._prompt_duration = 0.0
-            self._emit_obsidian_hermes_busy(True)
             agent_thread = threading.Thread(target=run_agent, daemon=True)
             agent_thread.start()
 
@@ -11107,8 +11094,6 @@ class HermesCLI:
                 # Normal completion: agent thread should be done already,
                 # but guard against edge cases.
                 agent_thread.join(timeout=30)
-
-            self._emit_obsidian_hermes_busy(False)
 
             # Freeze per-prompt elapsed timer once the agent thread has
             # exited (or been abandoned as a daemon after interrupt).
