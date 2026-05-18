@@ -2877,6 +2877,20 @@ class HermesCLI:
         self._background_tasks: Dict[str, threading.Thread] = {}
         self._background_task_counter = 0
 
+    def _emit_osc_status(self, status: str) -> None:
+        """Best-effort terminal status signal for host UIs like Hermes Console."""
+        if status not in {"busy", "idle"}:
+            return
+        value = "1" if status == "busy" else "0"
+        try:
+            if sys.stdout.isatty() and os.environ.get("OBSIDIAN_HERMES_CONSOLE") == "1":
+                # Use BEL terminator for broad xterm compatibility. Only emit inside
+                # Hermes Console; normal terminals/chats must not see this UI signal.
+                sys.stdout.write(f"\x1b]777;hermes:busy={value}\x07")
+                sys.stdout.flush()
+        except Exception:
+            pass
+
     def _invalidate(self, min_interval: float = 0.25) -> None:
         """Throttled UI repaint — prevents terminal blinking on slow/SSH connections."""
         if getattr(self, "_resize_recovery_pending", False):
@@ -13549,12 +13563,14 @@ class HermesCLI:
 
                     # Regular chat - run agent
                     self._agent_running = True
+                    self._emit_osc_status("busy")
                     app.invalidate()  # Refresh status line
 
                     try:
                         self.chat(user_input, images=submit_images or None)
                     finally:
                         self._agent_running = False
+                        self._emit_osc_status("idle")
                         self._spinner_text = ""
                         self._tool_start_time = 0.0
                         self._pending_tool_info.clear()
